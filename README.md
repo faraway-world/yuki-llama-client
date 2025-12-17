@@ -79,4 +79,32 @@ Conversation history is stored in:
 ```
 chats/default.json
 ```
-This allows persistence across sessions and easy inspection.
+
+This allows:
+
+* conversation persistence
+* manual inspection
+* future upgrades (summarization, pruning, embeddings)
+
+## Why this exists
+
+Most “AI apps” hide everything behind SDKs.
+
+This project does the opposite.
+
+It shows:
+
+* how streaming actually works
+* how prompts grow and break
+* how servers behave under long contexts
+* how fragile interfaces really are
+
+If you want abstractions, look elsewhere.
+If you want understanding, this is it.
+
+## Known Limitations
+
+* No retry logic
+* No context pruning
+* No role-based formatting enforcement
+* Single conversation at a time
