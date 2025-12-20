@@ -106,4 +106,4 @@ It shows:
 * No role-based formatting enforcement
 * Single conversation at a time
 
-Working on fixing these and imporving the ux as well progressing with new features.
+Working on fixing these and improving the ux as well progressing with new features.
