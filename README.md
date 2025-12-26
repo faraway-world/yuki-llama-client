@@ -16,10 +16,10 @@ This project exists to understand the system end-to-end — no SDKs, no abstract
 ## Architecture
 ```
 Local Machine (Client)        Remote Machine (Inference)
-┌─────────────────────┐      ┌──────────────────────────┐
-│  client.py/ main.rs │ ---> │  llama-server            │
-│  chat memory (JSON) │ HTTP │  GGUF model              │
-└─────────────────────┘      └──────────────────────────┘
+┌───────────────────────────────┐      ┌──────────────────────────┐
+│  client.py/ yuki_client (rust)│ ---> │  llama-server            │
+│  chat memory (JSON)           │ HTTP │  GGUF model              │
+└───────────────────────────────┘      └──────────────────────────┘
 ```
 
 
