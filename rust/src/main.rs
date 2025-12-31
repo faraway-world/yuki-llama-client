@@ -1,5 +1,6 @@
 use std::io::{self, Write};
 use std::fs;
+use std::path::{PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use futures_util::StreamExt;
 use reqwest::Client;
@@ -12,12 +13,6 @@ use rustyline::validate::Validator;
 use rustyline::{Context, Helper, Editor, Config};
 
 const SERVER_URL: &str = "http://127.0.0.1:8080/v1/chat/completions";
-
-// --- FOLDER STRUCTURE ---
-const ROOT_DIR: &str = "yuki_client";
-const HIST_DIR: &str = "yuki_client/history";
-const CHAT_DIR: &str = "yuki_client/chats";
-const BACKUP_DIR: &str = "yuki_client/backups";
 
 #[derive(Serialize, Deserialize, Clone)]
 struct Message {
@@ -39,6 +34,14 @@ struct Choice { delta: Delta }
 #[derive(Deserialize)]
 struct Delta { content: Option<String> }
 
+// --- THE ROOT FINDER ---
+// This forces the path to be absolute /home/user/yuki_client
+fn get_root_path() -> PathBuf {
+    let mut path = PathBuf::from(std::env::var("HOME").expect("Could not find HOME directory"));
+    path.push("yuki_client");
+    path
+}
+
 // --- TAB COMPLETION SETUP ---
 struct ChatCompleter;
 impl Helper for ChatCompleter {}
@@ -50,7 +53,8 @@ impl Completer for ChatCompleter {
     type Candidate = Pair;
     fn complete(&self, line: &str, _pos: usize, _ctx: &Context<'_>) -> rustyline::Result<(usize, Vec<Pair>)> {
         let mut completions = Vec::new();
-        if let Ok(entries) = fs::read_dir(HIST_DIR) {
+        let hist_dir = get_root_path().join("history");
+        if let Ok(entries) = fs::read_dir(hist_dir) {
             for entry in entries.flatten() {
                 let filename = entry.file_name().to_string_lossy().into_owned();
                 if filename.starts_with("history_") && filename.ends_with(".json") {
@@ -67,33 +71,37 @@ impl Completer for ChatCompleter {
 
 // --- LOGIC FUNCTIONS ---
 
-fn get_file_paths(chat_name: &str) -> (String, String) {
-    let history_path = format!("{}/history_{}.json", HIST_DIR, chat_name);
-    let summary_path = format!("{}/summary_{}.json", CHAT_DIR, chat_name);
+fn get_file_paths(chat_name: &str) -> (PathBuf, PathBuf) {
+    let root = get_root_path();
+    let history_path = root.join("history").join(format!("history_{}.json", chat_name));
+    let summary_path = root.join("chats").join(format!("summary_{}.json", chat_name));
     (history_path, summary_path)
 }
 
 fn ensure_dirs() -> io::Result<()> {
-    fs::create_dir_all(HIST_DIR)?;
-    fs::create_dir_all(CHAT_DIR)?;
-    fs::create_dir_all(BACKUP_DIR)?;
+    let root = get_root_path();
+    fs::create_dir_all(root.join("history"))?;
+    fs::create_dir_all(root.join("chats"))?;
+    fs::create_dir_all(root.join("backups"))?;
     Ok(())
 }
 
-fn create_backup(chat_name: &str, hist_path: &str) {
+fn create_backup(chat_name: &str, hist_path: &PathBuf) {
     if fs::metadata(hist_path).is_ok() {
         if let Ok(ts) = SystemTime::now().duration_since(UNIX_EPOCH) {
-            let backup_path = format!("{}/log_{}_{}.json", BACKUP_DIR, chat_name, ts.as_secs());
+            let backup_dir = get_root_path().join("backups");
+            let backup_path = backup_dir.join(format!("log_{}_{}.json", chat_name, ts.as_secs()));
             if fs::copy(hist_path, &backup_path).is_ok() {
-                println!("\x1b[94m[System] Archive created: {}\x1b[0m", backup_path);
+                println!("\x1b[94m[System] Archive created in backups folder.\x1b[0m");
             }
         }
     }
 }
 
 fn list_existing_chats() {
+    let hist_dir = get_root_path().join("history");
     println!("\x1b[94mExisting Chats:\x1b[0m");
-    if let Ok(entries) = fs::read_dir(HIST_DIR) {
+    if let Ok(entries) = fs::read_dir(hist_dir) {
         let mut found = false;
         for entry in entries.flatten() {
             let filename = entry.file_name().to_string_lossy().into_owned();
@@ -103,7 +111,7 @@ fn list_existing_chats() {
                 found = true;
             }
         }
-        if !found { println!("  (No existing chats found in {})", HIST_DIR); }
+        if !found { println!("  (No existing chats found)"); }
     }
     println!();
 }
@@ -112,13 +120,13 @@ fn load_initial_messages(chat_name: &str) -> Vec<Message> {
     let (hist_path, summ_path) = get_file_paths(chat_name);
     if let Ok(data) = fs::read_to_string(&summ_path) {
         if let Ok(msgs) = serde_json::from_str::<Vec<Message>>(&data) {
-            println!("\x1b[93m--- Loaded summary memory ({} messages) ---\x1b[0m", msgs.len());
+            println!("\x1b[93m--- Loaded summary memory ---\x1b[0m");
             return msgs;
         }
     }
     if let Ok(data) = fs::read_to_string(&hist_path) {
         if let Ok(msgs) = serde_json::from_str::<Vec<Message>>(&data) {
-            println!("\x1b[93m--- Loaded history ({} messages) ---\x1b[0m", msgs.len());
+            println!("\x1b[93m--- Loaded history ---\x1b[0m");
             return msgs;
         }
     }
@@ -126,7 +134,7 @@ fn load_initial_messages(chat_name: &str) -> Vec<Message> {
     Vec::new()
 }
 
-fn save_to_file(path: &str, messages: &Vec<Message>) {
+fn save_to_file(path: &PathBuf, messages: &Vec<Message>) {
     if let Ok(json) = serde_json::to_string_pretty(messages) {
         let _ = fs::write(path, json);
     }
@@ -185,7 +193,7 @@ async fn main() -> anyhow::Result<()> {
 
     println!("{}", logo);
     println!("\x1b[96mYuki Client (Rust) Started.\x1b[0m");
-    println!("\x1b[90mData Folder: {}\x1b[0m\n", ROOT_DIR);
+    println!("\x1b[90mGlobal Data Folder: {:?}\x1b[0m\n", get_root_path());
     list_existing_chats();
     
     let chat_name = match rl_name.readline("Enter Chat Name (Tab): ") {
@@ -197,10 +205,10 @@ async fn main() -> anyhow::Result<()> {
         Err(_) => return Ok(()),
     };
 
-    let mut rl = DefaultEditor::new()?;
     let (hist_path, summ_path) = get_file_paths(&chat_name);
     let mut messages = load_initial_messages(&chat_name);
     
+    let mut rl = DefaultEditor::new()?;
     println!("\x1b[90mCommands: 'exit', 'clear', 'summarize'\x1b[0m");
 
     loop {
@@ -218,7 +226,7 @@ async fn main() -> anyhow::Result<()> {
                     messages.clear();
                     let _ = fs::remove_file(&hist_path);
                     let _ = fs::remove_file(&summ_path);
-                    println!("\x1b[91mMemory wiped. History archived to {}/backups\x1b[0m", ROOT_DIR);
+                    println!("\x1b[91mMemory wiped. History archived.\x1b[0m");
                     continue;
                 }
 
