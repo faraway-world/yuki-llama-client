@@ -1,0 +1,18 @@
+[
+  {
+    "role": "user",
+    "content": "Testing the system. Please repeat 'Hello World'."
+  },
+  {
+    "role": "assistant",
+    "content": "Hello World. Is there anything specific you would like to test within the Yuki client?"
+  },
+  {
+    "role": "user",
+    "content": "No, I am clearing the history now."
+  },
+  {
+    "role": "system_note",
+    "content": "This session was archived via the 'clear' command."
+  }
+]
