@@ -1,0 +1,8 @@
+This represents what happens after a user runs the summarize command. It shows the "Memory Block" that keeps the context window lean.
+
+[
+  {
+    "role": "assistant",
+    "content": "MEMORY_BLOCK:\n- Discussion covered the architectural differences between SQL and Vector databases.\n- SQL is for structured, exact-match queries.\n- Vector DBs use embeddings for semantic similarity search.\n- Conclusion: Vector DBs are the industry standard for RAG-based LLM applications."
+  }
+]
